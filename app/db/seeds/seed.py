@@ -13,6 +13,15 @@ def seed_cag_reference_data(session: Session):
     rows = []
 
     for styles, text in REFERENCE_DATA_SEED:
+        exists = (
+            session.query(CAGReferenceData)
+            .filter_by(reference_text=text)
+            .first()
+        )
+
+        if exists:
+            continue
+
         rows.append(
             CAGReferenceData(
                 dining_styles=styles,
@@ -22,13 +31,27 @@ def seed_cag_reference_data(session: Session):
         )
 
     session.bulk_save_objects(rows)
-    print(f"Seeded {len(rows)} CAG reference rows.")
+    session.commit()
+
+    print(f"Seeded {len(rows)} new CAG reference rows.")
 
 
 def seed_prompt_templates(session: Session):
     rows = []
 
     for item in PROMPT_TEMPLATES_SEED:
+        exists = (
+            session.query(PromptTemplate)
+            .filter_by(
+                template_type=item["template_type"],
+                version=item["version"],
+            )
+            .first()
+        )
+
+        if exists:
+            continue
+
         rows.append(
             PromptTemplate(
                 template=item["template"],
@@ -38,7 +61,9 @@ def seed_prompt_templates(session: Session):
         )
 
     session.bulk_save_objects(rows)
-    print(f"Seeded {len(rows)} prompt templates.")
+    session.commit()
+
+    print(f"Seeded {len(rows)} new prompt templates.")
 
 
 def seed():
