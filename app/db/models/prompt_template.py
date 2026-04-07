@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text
+from sqlalchemy import Column, Integer, String, Text, UniqueConstraint
 from app.db.base import Base
 
 class PromptTemplate(Base):
@@ -7,5 +7,11 @@ class PromptTemplate(Base):
     id = Column(Integer, primary_key=True)
     template = Column(Text, nullable=False)
 
-    # The version of the prompt template - used for template selection
-    version = Column(Integer, unique=True, nullable=False)
+    # e.g. "random_recommendation"
+    template_type = Column(String, nullable=False)
+
+    # The version of the prompt template - unique for each type
+    version = Column(Integer, nullable=False)
+
+    __table_args__ = (UniqueConstraint("template_type", "version", name="uq_template_version"),
+)
