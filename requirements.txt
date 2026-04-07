@@ -4,3 +4,5 @@ pgvector
 fastapi
 uvicorn
 anthropic
+sqlalchemy
+psycopg

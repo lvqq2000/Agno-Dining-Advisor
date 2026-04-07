@@ -21,7 +21,7 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
-    command: python app/main.py
+    command: python -m app.main
 
 volumes:
   pgdata:
