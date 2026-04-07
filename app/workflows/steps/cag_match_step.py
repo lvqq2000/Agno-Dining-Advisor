@@ -1,6 +1,7 @@
 from app.services.cag_matching_service import find_top_k_matches
 from app.agents.cag_match import create_cag_match_agent
 from app.db.session import SessionLocal
+from app.core.constants import SIMILARITY_THRESHOLD
 import json
 import re
 
@@ -15,21 +16,18 @@ def cag_match_step(state):
         # 1. Get candidates from DB
         candidates = find_top_k_matches(session, user_input, k=5)
 
-        # 2. Build a textual prompt for the agent that includes the user input
-        #    and the candidate list so the LLM can reason over them directly.
-        candidates_text = []
-        for i, c in enumerate(candidates, start=1):
-            candidates_text.append(f"{i}. text: {c['reference_text']} | styles: {c['dining_styles']} | similarity: {c['similarity']}")
+        # 2. Provide structured JSON candidates to the agent so it can reason reliably.
+        candidates_json = json.dumps(candidates, ensure_ascii=False)
 
         prompt_text = (
-            f"User input: {user_input}\n\nCandidates:\n" + "\n".join(candidates_text)
-            + "\n\nChoose the single best matching candidate from the list above using the similarity scores as guidance."
-            + " Return a JSON object with keys: dining_styles (the candidate's dining_styles list), confidence (a float similarity between 0 and 1), and fallback (true if no candidate is suitable)."
-            + " If you are uncertain, still return the most likely dining_styles based on the candidates."
-            + " Example output: {\"dining_styles\": [\"Cafe\"], \"confidence\": 0.65, \"fallback\": false }"
+            f"User input: {user_input}\n\n"
+            f"Candidates (JSON):\n{candidates_json}\n\n"
+            f"Choose the single best matching candidate and RETURN ONLY a JSON object with keys:"
+            f" dining_styles (list), confidence (float 0..1), fallback (true/false)."
+            f" If confidence < {SIMILARITY_THRESHOLD} set fallback = true."
         )
 
-        # 3. Let LLM pick best match using a plain text prompt (agent has system instructions)
+        # 3. Let LLM pick best match using the agent (its system instructions are concise).
         agent = create_cag_match_agent()
         result = agent.run(prompt_text)
 
@@ -59,17 +57,23 @@ def cag_match_step(state):
                 except Exception:
                     parsed = None
 
-        # 5. Fallback: if parsing failed, pick the top candidate heuristically
-        if not parsed:
+        # 5. If parsing succeeded, normalize fallback according to canonical threshold.
+        if parsed:
+            try:
+                parsed_conf = float(parsed.get("confidence", 0.0))
+            except Exception:
+                parsed_conf = 0.0
+            # if model didn't provide a fallback flag, compute it consistently
+            if "fallback" not in parsed:
+                parsed["fallback"] = parsed_conf < SIMILARITY_THRESHOLD
+        else:
+            # If parsing failed, pick the top candidate heuristically using the same threshold
             if candidates:
                 top = max(candidates, key=lambda x: x.get('similarity', 0))
-                # Use a lower threshold for fallback determination so we still
-                # surface reasonable dining styles when similarity is low.
-                threshold = 0.50
                 parsed = {
                     "dining_styles": top.get('dining_styles', []),
                     "confidence": float(top.get('similarity', 0)),
-                    "fallback": False if top.get('similarity', 0) >= threshold else True,
+                    "fallback": float(top.get('similarity', 0)) < SIMILARITY_THRESHOLD,
                 }
             else:
                 parsed = {"dining_styles": [], "confidence": 0.0, "fallback": True}

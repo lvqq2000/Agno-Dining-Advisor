@@ -1,7 +1,6 @@
 from agno.workflow import Workflow, Step, Condition
-from app.workflows.steps import generate_with_cag_step
+from app.workflows.steps import generate_with_cag_step, generate_with_selection_step
 from app.workflows.steps.cag_match_step import cag_match_step
-from app.workflows.steps.generate_random_step import generate_random_step
 from app.workflows.steps.intake_step import intake_step
 from app.workflows.steps.rag_retrieve_step import rag_retrieve_step
 from app.workflows.steps.validate_output_step import validate_output_step
@@ -39,7 +38,7 @@ def create_workflow():
             Condition(
                 name="generation_strategy",
                 evaluator=lambda state: state.get("cag_result", {}).get("fallback", False),
-                steps=[generate_random_step],
+                steps=[generate_with_selection_step],
                 else_steps=[generate_with_cag_step],
             ),
 

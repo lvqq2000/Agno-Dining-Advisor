@@ -11,11 +11,6 @@ build:
 seed:
 	docker compose run --rm app python -m app.db.seeds.seed
 
-# Rebuild the app image and run seed (useful when requirements changed)
-seed-rebuild:
-	docker compose build --no-cache app
-	docker compose run --rm app python -m app.db.seeds.seed
-
 migrate:
 	docker compose exec app alembic upgrade head
 
