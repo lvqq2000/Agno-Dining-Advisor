@@ -10,5 +10,5 @@ def create_rag_match_agent():
       knowledge=knowledge,
       search_knowledge=True,
       model=DEFAULT_MODEL,
-      # instructions="Select prompt template based on the result of previous steps. Return restaurant recommendations."
+      # instructions="Return restaurant recommendations based on the user's preferences and dietary requirements."
     )

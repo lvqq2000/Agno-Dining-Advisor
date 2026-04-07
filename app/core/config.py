@@ -1,6 +1,11 @@
 import os
-from openai import OpenAI
+from app.core.constants import SIMILARITY_THRESHOLD
 
-MODEL_ID = os.getenv("MODEL_ID", "gpt-4o-mini")
+# Keep the model id as a simple string. The app's OpenAI/LLM service will
+# decide how to use this identifier with the chosen client library.
+# Model identifier should include the provider prefix expected by Agno, e.g. 'openai:gpt-4o-mini'
+MODEL_ID = os.getenv("MODEL_ID", "openai:gpt-4o-mini")
 
-DEFAULT_MODEL = OpenAI.Model(id=MODEL_ID)
+# Use a plain string for the default model identifier to avoid SDK-specific
+# object construction at import time (which caused startup failures).
+DEFAULT_MODEL = MODEL_ID

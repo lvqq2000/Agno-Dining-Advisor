@@ -15,8 +15,8 @@ Return the result in JSON format:
 """
 
 PROMPT_TEMPLATES_SEED = [
-    {
-        "template_type": TemplateType.RECOMMENDATION_WITH_CAG,
+  {
+    "template_type": TemplateType.RECOMMENDATION_WITH_CAG.value,
         "version": 1,
         "template": """You are a dining recommendation assistant.
 
@@ -35,8 +35,8 @@ For each restaurant, include:
 {JSON_RESPONSE_FORMAT}
 """,
     },
-    {
-        "template_type": TemplateType.RANDOM_RECOMMENDATION,
+  {
+    "template_type": TemplateType.RANDOM_RECOMMENDATION.value,
         "version": 1,
         "template": """You are a dining recommendation assistant.
 

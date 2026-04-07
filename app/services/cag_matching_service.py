@@ -1,28 +1,48 @@
-from app.core.config import SIMILARITY_THRESHOLD
 from app.services.embedding_service import get_embedding
-from sqlalchemy.orm import Session
+from app.db.models import CAGReferenceData
+import math
+import logging
+
+
+def _cosine_similarity(a, b):
+    # a and b are lists of floats
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(y * y for y in b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
 
 def find_top_k_matches(session, user_input: str, k: int = 5):
-    embedding = get_embedding(user_input)
+    """
+    Fallback implementation that computes cosine similarity in Python.
+    This avoids relying on the pgvector binding for raw SQL parameters.
+    It's acceptable for small reference datasets used in the seed.
+    """
+    query = session.query(CAGReferenceData)
+    rows = query.all()
+    logging.getLogger(__name__).debug(f"find_top_k_matches: loaded {len(rows)} reference rows")
 
-    results = session.execute(
-        """
-        SELECT 
-            reference_text,
-            dining_styles,
-            1 - (embedding <=> :embedding) AS similarity
-        FROM cag_reference_data
-        ORDER BY embedding <=> :embedding
-        LIMIT :k
-        """,
-        {"embedding": embedding, "k": k}
-    ).fetchall()
+    emb = get_embedding(user_input)
+
+    scored = []
+    for r in rows:
+        # r.embedding may be a list-like or pgvector type
+        ref_vec = list(r.embedding)
+        sim = _cosine_similarity(emb, ref_vec)
+        scored.append((sim, r))
+
+    scored.sort(key=lambda t: t[0], reverse=True)
+    top = scored[:k]
+    if top:
+        logging.getLogger(__name__).debug(f"find_top_k_matches: top similarity={top[0][0]}")
 
     return [
         {
             "reference_text": r.reference_text,
             "dining_styles": r.dining_styles,
-            "similarity": float(r.similarity),
+            "similarity": float(sim),
         }
-        for r in results
+        for sim, r in top
     ]

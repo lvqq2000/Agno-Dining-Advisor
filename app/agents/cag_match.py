@@ -1,8 +1,5 @@
 from agno.agent import Agent
 from app.core.config import DEFAULT_MODEL
-from sqlalchemy.orm import Session
-
-from app.services.cag_matching_service import match_user_input
 
 def create_cag_match_agent():
     return Agent(

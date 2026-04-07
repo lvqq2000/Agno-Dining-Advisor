@@ -87,4 +87,7 @@ REFERENCE_DATA_SEED = [
     (["Comfort Food"], "I'm feeling nostalgic and want something that reminds me of home"),
     (["Comfort Food"], "I'm feeling nostalgic and want something that reminds me of home"),
     (["Comfort Food"], "I'm feeling a bit emotional and want something comforting and familiar"),
+    (["Cafe"], "I'm feeling relaxed and want a cozy place to sip coffee and unwind"),
+    (["Cafe"], "I want a quiet cafe to read, relax, and enjoy a slow drink"),
+    (["Cafe"], "Feeling like a leisurely coffee in a warm, cozy café where I can recharge"),
 ]

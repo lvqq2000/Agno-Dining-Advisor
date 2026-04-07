@@ -14,9 +14,11 @@ def generate_random_step(state):
             version=1
         )
 
+        template_text = template.template if hasattr(template, 'template') else str(template)
+
         agent = generate_agent()
 
-        result = agent.run(template)
+        result = agent.run(template_text)
 
         state["output"] = result
         return state

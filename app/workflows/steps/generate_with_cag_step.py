@@ -9,10 +9,14 @@ def generate_recommendation_step(state):
     session = SessionLocal()
 
     try:
+
         template = get_prompt_template(
             session,
             template_type=TemplateType.RECOMMENDATION_WITH_CAG
         )
+
+        # template may be a DB model; extract the textual template
+        template_text = template.template if hasattr(template, 'template') else str(template)
 
         variables = {
             "cuisine": state.get("cuisine", "any"),
@@ -20,7 +24,7 @@ def generate_recommendation_step(state):
             "dining_style": ", ".join(state["cag_result"]["dining_styles"]),
         }
 
-        prompt = render_template(template, variables)
+        prompt = render_template(template_text, variables)
 
         agent = generate_agent()
 
