@@ -1,18 +1,20 @@
-.PHONY: setup run up down build rebuild logs
+.PHONY: setup migrate run up down build rebuild logs
+
+# Set up the environment
+setup: build run migrate
 
 # Build the containers
-setup:
+build:
 	docker compose build
+
+migrate:
+	docker compose exec app alembic upgrade head
 
 # Start the project
 run:
 	docker compose up
 
 # ---- Optional helper commands ----
-
-# Build the containers (same as setup, kept for flexibility)
-build:
-	docker compose build
 
 # Rebuild and start containers
 rebuild:

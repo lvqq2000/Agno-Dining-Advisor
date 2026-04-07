@@ -6,3 +6,6 @@ uvicorn
 anthropic
 sqlalchemy
 psycopg
+alembic
+python-dotenv
+sentence_transformers

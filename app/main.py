@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()  # Load environment variables
+
 from app.workflows.main_workflow import create_workflow
 
 workflow = create_workflow()
