@@ -1,8 +1,8 @@
-"""add multi dining styles and prompt template type/version uniqueness
+"""rename dining_style -> dining_styles (varchar[])
 
-Revision ID: 97395532e89d
-Revises: f28c68565e0b
-Create Date: 2026-04-07 08:37:54.474865
+Revision ID: b2c3d4e6f7
+Revises: a1b2c3d4e5f6
+Create Date: 2026-04-07 12:10:00.000000
 
 """
 from typing import Sequence, Union
@@ -12,48 +12,51 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '97395532e89d'
-down_revision: Union[str, Sequence[str], None] = 'f28c68565e0b'
+revision: str = 'b2c3d4e6f7'
+down_revision: Union[str, Sequence[str], None] = 'a1b2c3d4e5f6'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Upgrade schema."""
-    # Convert single-string dining_style -> multi-valued dining_styles (varchar[])
-    # 1) add a nullable dining_styles array column
+    """Convert cag_reference_data.dining_style (string) -> dining_styles (varchar[]).
+
+    Steps:
+    1. add nullable dining_styles array column
+    2. backfill from dining_style
+    3. set dining_styles NOT NULL
+    4. drop dining_style
+    """
     op.add_column(
         'cag_reference_data',
         sa.Column('dining_styles', sa.ARRAY(sa.String()), nullable=True),
     )
 
-    # 2) backfill from existing dining_style (wrap into single-element array)
+    # Wrap existing single-value dining_style into an array for each row
     op.execute(
         "UPDATE cag_reference_data SET dining_styles = ARRAY[dining_style]::varchar[] WHERE dining_style IS NOT NULL"
     )
 
-    # 3) make dining_styles non-nullable (existing rows have been backfilled)
+    # Make dining_styles non-nullable
     op.alter_column('cag_reference_data', 'dining_styles', nullable=False)
 
-    # 4) drop the old dining_style column
+    # Drop old column
     op.drop_column('cag_reference_data', 'dining_style')
 
 
 def downgrade() -> None:
-    """Downgrade schema."""
-    # Revert dining_styles array back to single dining_style string column
+    """Revert dining_styles -> dining_style (single string).
+
+    This will keep only the first element if multiple were present.
+    """
     op.add_column(
         'cag_reference_data',
         sa.Column('dining_style', sa.String(), nullable=True),
     )
 
-    # Populate dining_style from the first element of dining_styles when available
     op.execute(
         "UPDATE cag_reference_data SET dining_style = (CASE WHEN array_length(dining_styles,1) >= 1 THEN dining_styles[1] ELSE NULL END)"
     )
 
-    # Make dining_style non-nullable if you prefer; keep nullable to be safe
     op.alter_column('cag_reference_data', 'dining_style', nullable=False)
-
-    # Drop the array column
     op.drop_column('cag_reference_data', 'dining_styles')

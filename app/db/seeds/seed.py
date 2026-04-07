@@ -5,7 +5,6 @@ from sentence_transformers import SentenceTransformer
 from app.db.seeds.reference_data_seed import REFERENCE_DATA_SEED
 from app.db.seeds.prompt_templates_seed import PROMPT_TEMPLATES_SEED
 
-
 # Load SentenceTransformer model for embeddings
 embedding_model = SentenceTransformer("all-mpnet-base-v2")
 

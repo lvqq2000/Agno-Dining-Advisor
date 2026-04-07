@@ -3,9 +3,9 @@ psycopg2-binary
 pgvector
 fastapi
 uvicorn
-anthropic
 sqlalchemy
 psycopg
 alembic
 python-dotenv
 sentence_transformers
+openai

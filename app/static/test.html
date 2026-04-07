@@ -1,0 +1,215 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Agno Dining Advisor - Test UI</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px }
+    label { display:block; margin-top: 8px }
+    textarea { width: 100%; height: 80px }
+    #events { white-space: pre-wrap; background:#f7f7f7; padding:10px; border:1px solid #ddd }
+    #result { background: #fff; border: 1px solid #eee; padding: 12px; border-radius: 6px }
+    .restaurant { padding:12px; border-radius:6px; border:1px solid #f0f0f0; margin:8px 0; background:linear-gradient(180deg,#fff,#fcfcfc) }
+    .restaurant h3 { margin:0 0 6px 0 }
+    .restaurant .location { color:#666; font-size:0.9em; margin-bottom:6px }
+    .muted { color:#666; font-size:0.9em }
+  </style>
+</head>
+<body>
+  <h1>Agno Dining Advisor - Test UI</h1>
+  <form id="form">
+    <label>How do you feel today?</label>
+    <textarea name="feeling" id="feeling-input" placeholder="e.g. I'm in the mood for something cozy">Relaxed</textarea>
+
+    <label>Cuisine</label>
+    <select name="cuisine" id="cuisine-select">
+      <!-- options populated from /options -->
+    </select>
+
+    <label>Dietary Requirement</label>
+    <select name="dietary_requirement" id="dietary-select">
+      <!-- options populated from /options -->
+    </select>
+
+    <div style="margin-top:12px">
+      <button type="submit">Recommend (SSE)</button>
+      <button type="button" id="random-btn">Random recommendation</button>
+    </div>
+  </form>
+
+  <h2>Result</h2>
+  <div id="result">(no result yet)</div>
+
+  <h2>Events</h2>
+  <div id="events">(no events yet)</div>
+
+  <h2>Traces</h2>
+  <pre id="traces">(no traces yet)</pre>
+
+  <script>
+  const form = document.getElementById('form')
+  const events = document.getElementById('events')
+  const traces = document.getElementById('traces')
+  const result = document.getElementById('result')
+
+  // store latest CAG guess for use when generation arrives
+  let latestCag = null
+
+    // Minimal client implementation using fetch and ReadableStream to receive SSE from POST
+    // since EventSource doesn't support POST, we use fetch and parse
+    async function postSSE(formData) {
+      const res = await fetch('/recommend', {
+        method: 'POST',
+        body: formData
+      })
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder('utf-8')
+      let buf = ''
+      while (true) {
+        const {done, value} = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, {stream: true})
+        // parse SSE chunks
+        let parts = buf.split('\n\n')
+        buf = parts.pop()
+        for (const part of parts) {
+          if (!part.trim()) continue
+          const lines = part.split('\n')
+          let event = null
+          let data = ''
+          for (const line of lines) {
+            if (line.startsWith('event:')) event = line.replace('event:','').trim()
+            if (line.startsWith('data:')) data += line.replace('data:','').trim()
+          }
+          events.textContent += `[${new Date().toLocaleTimeString()}] ${event}: ${data}\n`
+          try {
+            const obj = JSON.parse(data)
+            // If this is the cag_match step, remember its output (a dict)
+            if (event === 'step:cag_match' && obj.output) {
+              try {
+                latestCag = typeof obj.output === 'string' ? JSON.parse(obj.output) : obj.output
+              } catch (e) {
+                latestCag = obj.output
+              }
+            }
+
+            // If the event contains a generation output, try to parse and render it nicely
+            if (obj.output && (event && event.startsWith('step:generate') || event === 'step:finished')) {
+              let out = obj.output
+              // strip markdown code fences if present
+              if (typeof out === 'string') {
+                out = out.trim()
+                // remove ```json or ``` wrappers
+                out = out.replace(/^```\w*\n/, '')
+                out = out.replace(/\n```$/, '')
+              }
+              let parsed = out
+              try {
+                if (typeof out === 'string') parsed = JSON.parse(out)
+              } catch (e) { /* keep raw string */ }
+
+              // If parsed is an object with restaurants array, render cards
+              if (parsed && parsed.restaurants && Array.isArray(parsed.restaurants)) {
+                renderResult(parsed.restaurants, latestCag)
+              } else {
+                // fallback: show pretty-printed content
+                result.textContent = typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2)
+              }
+            }
+
+            if (obj.session_id) {
+              // fetch traces after finished
+              fetch('/traces/' + obj.session_id).then(r=>r.json()).then(j=>{
+                traces.textContent = JSON.stringify(j, null, 2)
+              })
+            }
+          } catch (e){}
+        }
+      }
+    }
+
+    // Hook our minimal implementation to the form: map `feeling` -> `description` for server
+    form.addEventListener('submit', (ev) => {
+      ev.preventDefault()
+      events.textContent = ''
+      traces.textContent = ''
+      const fd = new FormData()
+  const feeling = document.getElementById('feeling-input').value || ''
+  fd.append('feeling', feeling)
+      // preserve selects
+      fd.append('cuisine', document.getElementById('cuisine-select').value)
+      fd.append('dietary_requirement', document.getElementById('dietary-select').value)
+      postSSE(fd)
+    })
+
+    // Random recommendation button: send an empty description to trigger fallback/random path
+    document.getElementById('random-btn').addEventListener('click', (ev) => {
+      ev.preventDefault()
+      events.textContent = ''
+      traces.textContent = ''
+      const fd = new FormData()
+  // leave feeling blank to encourage fallback to random generator
+  fd.append('feeling', '')
+      postSSE(fd)
+    })
+
+    // Populate selects from server-provided enums
+    async function loadOptions() {
+      try {
+        const res = await fetch('/options')
+        const j = await res.json()
+
+        const cuisineSelect = document.getElementById('cuisine-select')
+        cuisineSelect.innerHTML = ''
+        for (const c of j.cuisines) {
+          const opt = document.createElement('option')
+          opt.value = c
+          opt.textContent = c.charAt(0).toUpperCase() + c.slice(1)
+          cuisineSelect.appendChild(opt)
+        }
+
+        const dietarySelect = document.getElementById('dietary-select')
+        dietarySelect.innerHTML = ''
+        for (const d of j.dietary_requirements) {
+          const opt = document.createElement('option')
+          opt.value = d
+          // display-friendly label
+          opt.textContent = d.split('-').map(s=>s.charAt(0).toUpperCase()+s.slice(1)).join(' ')
+          dietarySelect.appendChild(opt)
+        }
+
+      } catch (e) {
+        console.error('Failed to load options', e)
+      }
+    }
+
+    // load options on page load
+    loadOptions()
+
+    function renderResult(restaurants, cag) {
+      // header showing guessed dining style
+      let header = ''
+      if (cag && cag.dining_styles && cag.dining_styles.length) {
+        const styles = cag.dining_styles.join(', ')
+        const conf = cag.confidence ? ` (confidence ${Math.round(cag.confidence * 100)}%)` : ''
+        header = `<div class="muted">Guess you like: <strong>'${styles}'</strong>${conf}</div>`
+      } else if (cag && cag.fallback) {
+        header = `<div class="muted">No strong dining-style match found; showing general recommendations.</div>`
+      }
+
+      let html = `${header}<h3>Recommendation for you...</h3>`
+      for (const r of restaurants) {
+        html += `<div class="restaurant"><h3>${escapeHtml(r.name || 'Unnamed')}</h3><div class="location">${escapeHtml(r.location || '')}</div><div class="desc">${escapeHtml(r.description || '')}</div></div>`
+      }
+      result.innerHTML = html
+    }
+
+    function escapeHtml(s){
+      if (!s) return ''
+      return String(s).replace(/[&<>"']/g, function(c){
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]
+      })
+    }
+  </script>
+</body>
+</html>

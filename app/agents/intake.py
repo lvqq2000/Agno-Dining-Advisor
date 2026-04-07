@@ -1,5 +1,5 @@
 from agno.agent import Agent
-from app.config import DEFAULT_MODEL
+from app.core.config import DEFAULT_MODEL
 
 def create_intake_agent():
     return Agent(

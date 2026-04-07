@@ -13,5 +13,5 @@ class CAGReferenceData(Base):
     # The reference text users might input
     reference_text = Column(Text, nullable=False)
 
-    # Embedding vector for semantic matching
-    embedding = Column(Vector(1536), nullable=False)
+    # Embedding vector for semantic matching (mpnet 'all-mpnet-base-v2' produces 768-dim vectors)
+    embedding = Column(Vector(768), nullable=False)
