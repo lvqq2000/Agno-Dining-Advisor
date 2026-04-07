@@ -86,14 +86,13 @@ This project uses `make` to simplify common development commands.
 After completing the setup:
 
 ```bash
-# Install dependencies and prepare the project
+# Prepare the project and start
 make setup
-
-# Start the project
-make run
 ```
 
 ### 3. Run tests
+
+> TO DO
 
 ```bash
 # Run all tests
