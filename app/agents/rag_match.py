@@ -1,5 +1,5 @@
 from agno.agent import Agent
-from app.config import DEFAULT_MODEL
+from app.core.config import DEFAULT_MODEL
 from app.knowledge.knowledge_base import get_knowledge_base
 
 def create_rag_match_agent():

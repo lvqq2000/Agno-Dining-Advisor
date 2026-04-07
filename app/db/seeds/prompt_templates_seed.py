@@ -1,3 +1,6 @@
+from app.models.enums import TemplateType
+
+
 JSON_RESPONSE_FORMAT = """
 Return the result in JSON format:
 {
@@ -13,7 +16,7 @@ Return the result in JSON format:
 
 PROMPT_TEMPLATES_SEED = [
     {
-        "template_type": "standard",
+        "template_type": TemplateType.RECOMMENDATION_WITH_CAG,
         "version": 1,
         "template": """You are a dining recommendation assistant.
 
@@ -33,7 +36,7 @@ For each restaurant, include:
 """,
     },
     {
-        "template_type": "random",
+        "template_type": TemplateType.RANDOM_RECOMMENDATION,
         "version": 1,
         "template": """You are a dining recommendation assistant.
 

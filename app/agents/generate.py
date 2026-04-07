@@ -1,9 +1,19 @@
 from agno.agent import Agent
-from app.config import DEFAULT_MODEL
+from app.core.config import DEFAULT_MODEL
 
-def create_generate_agent():
+def generate_agent():
     return Agent(
         name="Generate",
         model=DEFAULT_MODEL,
-        # instructions="Use embeddings to find the best semantic match between the user's free-text input and the reference data"
+        instructions="""
+You are a dining recommendation assistant.
+
+- You will receive a fully prepared prompt with all variables already filled.
+- Follow the instructions inside the prompt exactly.
+- Always return valid JSON.
+
+IMPORTANT:
+- Do NOT ignore the prompt content
+- Do NOT add extra explanation outside JSON
+"""
     )
