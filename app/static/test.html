@@ -147,16 +147,6 @@
       postSSE(fd)
     })
 
-    // Random recommendation button: send an empty description to trigger fallback/random path
-    document.getElementById('random-btn').addEventListener('click', (ev) => {
-      ev.preventDefault()
-      events.textContent = ''
-      traces.textContent = ''
-      const fd = new FormData()
-  // leave feeling blank to encourage fallback to random generator
-  fd.append('feeling', '')
-      postSSE(fd)
-    })
 
     // Update tip area based on feeling input and any known CAG result
     function updateTip() {
