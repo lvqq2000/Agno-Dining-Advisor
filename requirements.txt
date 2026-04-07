@@ -1,0 +1,8 @@
+agno[all]
+psycopg2-binary
+pgvector
+fastapi
+uvicorn
+anthropic
+sqlalchemy
+psycopg
