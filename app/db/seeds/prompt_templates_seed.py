@@ -69,4 +69,24 @@ For each restaurant, include:
 {JSON_RESPONSE_FORMAT}
 """,
     },
+  {
+    "template_type": TemplateType.RECOMMENDATION_WITH_CAG_AND_RAG.value,
+        "version": 1,
+        "template": """You are a dining recommendation assistant.
+
+User preferences:
+- Cuisine: {{cuisine}}
+- Dietary requirements: {{dietary_requirement}}
+- Dining style: {{dining_style}}
+
+Based on the above, recommend 3 real restaurants in Melbourne. Use the knowledge base to find suitable options.
+
+For each restaurant, include:
+- Name
+- Location
+- Short funny description (maximum 60 words)
+
+{JSON_RESPONSE_FORMAT}
+""",
+    },
 ]

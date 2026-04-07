@@ -1,8 +1,7 @@
 from agno.workflow import Workflow, Step, Condition
-from app.workflows.steps import generate_with_cag_step, generate_with_selection_step
+from app.workflows.steps import generate_with_cag_step, generate_with_rag_step, generate_with_selection_step
 from app.workflows.steps.cag_match_step import cag_match_step
 from app.workflows.steps.intake_step import intake_step
-from app.workflows.steps.rag_retrieve_step import rag_retrieve_step
 from app.workflows.steps.validate_output_step import validate_output_step
 
 
@@ -22,24 +21,23 @@ def create_workflow():
             # CAG matching to map free text to dining styles
             cag_match_step,
 
-            # Optional RAG retrieval when CAG confidence is low
-            #Condition(
-            #    condition=lambda state: (
-            #        # run RAG if no cag_result or confidence is below threshold
-            #        (not state.get("cag_result"))
-            #        or (state.get("cag_result", {}).get("confidence", 1.0) < 0.8)
-            #    ),
-            #    if_true=rag_retrieve_step,
-            #    if_false=None,
-            #),
-
             # Choose generation strategy based on CAG fallback flag
             # Use the agno.Condition API (evaluator, steps, else_steps)
             Condition(
-                name="generation_strategy",
+                name="generation_strategy_fallback",
                 evaluator=lambda state: state.get("cag_result", {}).get("fallback", False),
                 steps=[generate_with_selection_step],
-                else_steps=[generate_with_cag_step],
+                else_steps=[generate_with_rag_step],
+            ),
+
+            Condition(
+                name="generation_strategy_if_rag_fail",
+                # Use the RAG retrieval results placed on state['rag_results'] by
+                # `rag_retrieve_step`. If RAG returned no documents (empty list
+                # or falsy), fall back to the CAG-driven generator (without using stored knowledge).
+                evaluator=lambda state: not state.get("rag_results"),
+                steps=[generate_with_cag_step],
+                else_steps=[generate_with_rag_step],
             ),
 
             # Validate LLM output against Pydantic schema

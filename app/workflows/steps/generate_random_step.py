@@ -11,7 +11,6 @@ def generate_random_step(state):
         template = get_prompt_template(
             session,
             template_type=TemplateType.RANDOM_RECOMMENDATION,
-            version=1
         )
 
         template_text = template.template if hasattr(template, 'template') else str(template)

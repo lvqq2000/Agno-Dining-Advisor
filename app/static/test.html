@@ -33,9 +33,11 @@
 
     <div style="margin-top:12px">
       <button type="submit">Recommend (SSE)</button>
-      <button type="button" id="random-btn">Random recommendation</button>
+      <button id="random-btn" style="margin-left:8px">Random</button>
     </div>
   </form>
+
+    <div id="tip" class="muted" style="margin-top:12px">Tip: enter how you feel and press Recommend. For example, try "Relaxed".</div>
 
   <h2>Result</h2>
   <div id="result">(no result yet)</div>
@@ -54,6 +56,7 @@
 
   // store latest CAG guess for use when generation arrives
   let latestCag = null
+  let latestFeeling = document.getElementById('feeling-input').value || ''
 
     // Minimal client implementation using fetch and ReadableStream to receive SSE from POST
     // since EventSource doesn't support POST, we use fetch and parse
@@ -135,6 +138,8 @@
       traces.textContent = ''
       const fd = new FormData()
   const feeling = document.getElementById('feeling-input').value || ''
+    latestFeeling = feeling
+    updateTip()
   fd.append('feeling', feeling)
       // preserve selects
       fd.append('cuisine', document.getElementById('cuisine-select').value)
@@ -142,15 +147,42 @@
       postSSE(fd)
     })
 
-    // Random recommendation button: send an empty description to trigger fallback/random path
-    document.getElementById('random-btn').addEventListener('click', (ev) => {
-      ev.preventDefault()
-      events.textContent = ''
-      traces.textContent = ''
-      const fd = new FormData()
-  // leave feeling blank to encourage fallback to random generator
-  fd.append('feeling', '')
-      postSSE(fd)
+
+    // Update tip area based on feeling input and any known CAG result
+    function updateTip() {
+      const tipEl = document.getElementById('tip')
+      const f = (latestFeeling || '').toLowerCase()
+      // If we have a real CAG result, show it and its confidence
+      if (latestCag && latestCag.dining_styles) {
+        const styles = latestCag.dining_styles.join(', ')
+        const conf = latestCag.confidence ? Math.round(latestCag.confidence * 100) : null
+        if (conf !== null) {
+          if (conf >= 50) {
+            tipEl.innerHTML = `Detected dining styles: <strong>${styles}</strong> (confidence ${conf}%). The generator will use the CAG result.`
+            return
+          } else {
+            tipEl.innerHTML = `No strong dining-style match found; showing general recommendations. Detected: <strong>${styles}</strong> (confidence ${conf}%)` 
+            return
+          }
+        }
+      }
+
+      // No CAG yet - show illustrative tips for specific feeling keywords
+      if (f.includes('relax')) {
+        tipEl.innerHTML = `Tip: "Relaxed" typically maps to dining styles <strong>Brunch, Casual Dining</strong> (example confidence 56%). Expect generation that uses the CAG result plus your other preferences.`
+      } else if (f.includes('happy')) {
+        tipEl.innerHTML = `Tip: "Happy" may not map strongly to a single dining-style. Example: <strong>Casual Dining</strong> (confidence 40%) — below 50% so general recommendations are shown.`
+      } else if (f.includes('sad')) {
+        tipEl.innerHTML = `Tip: "Sad" might map to <strong>Comfort Food</strong> (example confidence 31%) but confidence is low, so general recommendations will be returned.`
+      } else {
+        tipEl.innerHTML = `Tip: enter a short feeling (e.g. "Relaxed", "Happy", "Sad") to see how the CAG maps feelings to dining styles.`
+      }
+    }
+
+    // Update tip live as user types
+    document.getElementById('feeling-input').addEventListener('input', (e)=>{
+      latestFeeling = e.target.value || ''
+      updateTip()
     })
 
     // Populate selects from server-provided enums
@@ -183,13 +215,16 @@
       }
     }
 
-    // load options on page load
-    loadOptions()
+  // load options on page load
+  loadOptions()
+
+  // initialize tip based on default feeling value
+  updateTip()
 
     function renderResult(restaurants, cag) {
       // header showing guessed dining style
       let header = ''
-      if (cag && cag.dining_styles && cag.dining_styles.length) {
+      if (cag && cag.dining_styles && cag.dining_styles.length && !cag.fallback) {
         const styles = cag.dining_styles.join(', ')
         const conf = cag.confidence ? ` (confidence ${Math.round(cag.confidence * 100)}%)` : ''
         header = `<div class="muted">Guess you like: <strong>'${styles}'</strong>${conf}</div>`
