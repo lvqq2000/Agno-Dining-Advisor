@@ -141,7 +141,7 @@ make setup
 
 ### 3. Access the test interface
 
-Open <http://localhost:8000/test> to interact with the project through a simple UI.
+Open <http://localhost:8000> or <http://localhost:8000/test> to interact with the project through a simple UI.
 
 ### 3. Run tests
 
@@ -164,3 +164,5 @@ Notes
 - Improve error handling logic such as multiple guardrails (structural + content-level), retry attempts
 - Better CAG edge cases handles for multiple strong matches
 - Better structured SSE events
+- Add the ability to show process on knowledge insert - right now the documents are not chunked, which make the retrival process very long. Also it should show error if fail to insert
+- Better UI

@@ -44,7 +44,7 @@ I chose to develop a dining advisor that recommends restaurant options based on 
 
 This domain works well with CAG because user preferences can be expressed as free text (e.g., "cheap", "romantic") and semantically matched to predefined dining styles. Based on the detected dining style and the user’s preferences, the system can apply different generation strategies, such as selecting different prompt templates.
 
-RAG matching is used after CAG matching. It will search the stored knowledge, which are restarant recommendation webistes, to recommend restaurant based on the detected dining style.
+Optional RAG matching will be performed after CAG matching. It will search the stored knowledge base, which are stored restarant recommendation websites, to recommend restaurants based on the detected dining style.
 
 ## System architecture diagram
 
@@ -186,7 +186,7 @@ Pydantic Validation
 | --------------------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------- | --------------------------------------------- | ------------------------------------------------|
 | Intake                                                    | Form submission                                                      | string, boolean, enums (as strings) | Validation result                             | boolean, error message                                         |
 | CAG Matching (if user chooses to include preferences)     | User preference (free text)                                          | string                              | Relevant dining styles with confidence scores | List of tuples (dining style: string, confidence score: float)                        |
-| RAG Retrieval (after CAG Matching) with Generation        | Dining style, cuisine preference, dietary requirements               | string, string, string              | Generated recommendations                     | string (JSON format) or empty array(string)                                        |
+| RAG Retrieval (after CAG Matching) with Generation (optional)  | Dining style, cuisine preference, dietary requirements               | string, string, string              | Generated recommendations                     | string (JSON format) or empty array(string)                                        |
 | Generation (if RAG didn't return relible recommendations) | User preferences and/or selected dining style                        | string, boolean                     | Generated recommendations                     | string (JSON format)                                         |
 | Validation                                                | Generated recommendations                                            | string                              | Validation result                             | boolean, error message                                         |
 
@@ -424,16 +424,13 @@ Event format (SSE)
   - `output`: step output (when `status == "completed"`). The shape depends on the step.
   - `error`: human-readable message (when `status == "error"`).
 
-Important step event names and typical payloads
+Important example step event names and typical payloads
 
-- `step:cag_match`
+- `step:cag_match_step`
   - started: {"status":"started","input":{...}}
   - completed: {"status":"completed","output": {"dining_styles": [string], "confidence": float, "fallback": bool, "candidates": [...]}}
 
-- `step:rag_retrieve` (present only when the workflow decides to run RAG)
-  - completed: {"status":"completed","output": <rag results (array or object)>}
-
-- `step:generate:with_cag` or `step:generate:random`
+- `step:generate_with_rag_step` or `step:random_generatation_step`
   - started/completed events. `completed` `output` is the generator result. The generator often returns a JSON string (sometimes wrapped in Markdown code fences). Clients should safely strip fences and parse the JSON if possible.
 
 - `step:finished`
