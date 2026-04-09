@@ -5,11 +5,10 @@ from app.db.session import SessionLocal
 from app.models.enums import TemplateType
 from app.services.template_renderer import render_template
 
-def generate_recommendation_step(state):
+def generate_with_rag_step(state):
     session = SessionLocal()
 
     try:
-
         template = get_prompt_template(
             session,
             template_type=TemplateType.RECOMMENDATION_WITH_CAG_AND_RAG

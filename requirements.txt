@@ -9,3 +9,4 @@ alembic
 python-dotenv
 sentence_transformers
 openai
+beautifulsoup4

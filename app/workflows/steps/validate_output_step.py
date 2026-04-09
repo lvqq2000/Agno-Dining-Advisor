@@ -26,8 +26,8 @@ def validate_output_step(state):
         parsed = raw
 
     try:
-        model = ResponseModel.parse_obj(parsed)
-        state["validated_output"] = model.dict()
+        model = ResponseModel.model_validate(parsed)
+        state["validated_output"] = model.model_dump()
         return state
     except Exception as e:
         state["validation_error"] = str(e)

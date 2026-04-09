@@ -29,7 +29,7 @@ def cag_match_step(state):
 
         # 3. Let LLM pick best match using the agent (its system instructions are concise).
         agent = create_cag_match_agent()
-        result = agent.run(prompt_text)
+        result = agent.run(prompt_text, stream=True, stream_events=True)
 
         # result may be a RunOutput; try to extract the textual content
         text_out = None

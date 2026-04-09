@@ -26,6 +26,5 @@ def get_knowledge_base():
 
         for url in KNOWLEDGE_BASE_URLS:
             _knowledge_instance.insert(url=url, skip_if_exists=True)
-        #  _knowledge_instance.load_content()
 
     return _knowledge_instance

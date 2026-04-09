@@ -32,12 +32,27 @@
     </select>
 
     <div style="margin-top:12px">
-      <button type="submit">Recommend (SSE)</button>
-      <button id="random-btn" style="margin-left:8px">Random</button>
+      <button type="submit" data-rag="false">Recommend</button>
+
+<button type="submit" data-rag="true">
+  Recommend (With RAG Matching)
+</button>
+
+<button type="button" id="random-btn" style="margin-left:8px">Random</button>
     </div>
   </form>
 
-    <div id="tip" class="muted" style="margin-top:12px">Tip: enter how you feel and press Recommend. For example, try "Relaxed".</div>
+    <div id="tip" class="muted" style="margin-top:12px">
+      <strong>Note:</strong><br/>
+      First request with RAG Matching may take ~10 minutes to load documents into the knowledge base and populate the cache; subsequent requests should be faster.<br/>
+      Right now the RAG Matching have trouble loading some documents. It needs improvement in document retrieval.<br/>
+
+      <strong>Test cases:</strong><br/>
+
+      "Relaxed" → <strong>Brunch, Casual Dining</strong> (confidence 56%) → uses CAG result<br/>
+      "Happy" → <strong>Casual Dining</strong> (confidence 40%) → low confidence, general recommendations<br/>
+      "Sad" → <strong>Comfort Food</strong> (confidence 31%) → fallback to general recommendations
+    </div>
 
   <h2>Result</h2>
   <div id="result">(no result yet)</div>
@@ -54,181 +69,176 @@
   const traces = document.getElementById('traces')
   const result = document.getElementById('result')
 
-  // store latest CAG guess for use when generation arrives
-  let latestCag = null
-  let latestFeeling = document.getElementById('feeling-input').value || ''
-
-    // Minimal client implementation using fetch and ReadableStream to receive SSE from POST
-    // since EventSource doesn't support POST, we use fetch and parse
-    async function postSSE(formData) {
-      const res = await fetch('/recommend', {
-        method: 'POST',
-        body: formData
-      })
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder('utf-8')
-      let buf = ''
-      while (true) {
-        const {done, value} = await reader.read()
-        if (done) break
-        buf += decoder.decode(value, {stream: true})
-        // parse SSE chunks
-        let parts = buf.split('\n\n')
-        buf = parts.pop()
-        for (const part of parts) {
-          if (!part.trim()) continue
-          const lines = part.split('\n')
-          let event = null
-          let data = ''
-          for (const line of lines) {
-            if (line.startsWith('event:')) event = line.replace('event:','').trim()
-            if (line.startsWith('data:')) data += line.replace('data:','').trim()
-          }
-          events.textContent += `[${new Date().toLocaleTimeString()}] ${event}: ${data}\n`
-          try {
-            const obj = JSON.parse(data)
-            // If this is the cag_match step, remember its output (a dict)
-            if (event === 'step:cag_match' && obj.output) {
-              try {
-                latestCag = typeof obj.output === 'string' ? JSON.parse(obj.output) : obj.output
-              } catch (e) {
-                latestCag = obj.output
-              }
-            }
-
-            // If the event contains a generation output, try to parse and render it nicely
-            if (obj.output && (event && event.startsWith('step:generate') || event === 'step:finished')) {
-              let out = obj.output
-              // strip markdown code fences if present
-              if (typeof out === 'string') {
-                out = out.trim()
-                // remove ```json or ``` wrappers
-                out = out.replace(/^```\w*\n/, '')
-                out = out.replace(/\n```$/, '')
-              }
-              let parsed = out
-              try {
-                if (typeof out === 'string') parsed = JSON.parse(out)
-              } catch (e) { /* keep raw string */ }
-
-              // If parsed is an object with restaurants array, render cards
-              if (parsed && parsed.restaurants && Array.isArray(parsed.restaurants)) {
-                renderResult(parsed.restaurants, latestCag)
-              } else {
-                // fallback: show pretty-printed content
-                result.textContent = typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2)
-              }
-            }
-
-            if (obj.session_id) {
-              // fetch traces after finished
-              fetch('/traces/' + obj.session_id).then(r=>r.json()).then(j=>{
-                traces.textContent = JSON.stringify(j, null, 2)
-              })
-            }
-          } catch (e){}
-        }
-      }
-    }
-
-    // Hook our minimal implementation to the form: map `feeling` -> `description` for server
-    form.addEventListener('submit', (ev) => {
-      ev.preventDefault()
-      events.textContent = ''
-      traces.textContent = ''
-      const fd = new FormData()
-  const feeling = document.getElementById('feeling-input').value || ''
-    latestFeeling = feeling
-    updateTip()
-  fd.append('feeling', feeling)
-      // preserve selects
-      fd.append('cuisine', document.getElementById('cuisine-select').value)
-      fd.append('dietary_requirement', document.getElementById('dietary-select').value)
-      postSSE(fd)
+  // Minimal client implementation using fetch and ReadableStream to receive SSE from POST
+  // since EventSource doesn't support POST, we use fetch and parse
+  async function postSSE(formData) {
+    const res = await fetch('/recommend', {
+      method: 'POST',
+      body: formData
     })
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder('utf-8')
+    let buf = ''
+    while (true) {
+      const {done, value} = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, {stream: true})
+      // parse SSE chunks
+      let parts = buf.split('\n\n')
+      buf = parts.pop()
+      for (const part of parts) {
+        if (!part.trim()) continue
+        const lines = part.split('\n')
+        let event = null
+        let data = ''
+        for (const line of lines) {
+          if (line.startsWith('event:')) event = line.replace('event:','').trim()
+          if (line.startsWith('data:')) data += line.replace('data:','').trim()
+        }
+        events.textContent += `[${new Date().toLocaleTimeString()}] ${event}: ${data}\n`
+        try {
+          const obj = JSON.parse(data)
 
-
-    // Update tip area based on feeling input and any known CAG result
-    function updateTip() {
-      const tipEl = document.getElementById('tip')
-      const f = (latestFeeling || '').toLowerCase()
-      // If we have a real CAG result, show it and its confidence
-      if (latestCag && latestCag.dining_styles) {
-        const styles = latestCag.dining_styles.join(', ')
-        const conf = latestCag.confidence ? Math.round(latestCag.confidence * 100) : null
-        if (conf !== null) {
-          if (conf >= 50) {
-            tipEl.innerHTML = `Detected dining styles: <strong>${styles}</strong> (confidence ${conf}%). The generator will use the CAG result.`
-            return
-          } else {
-            tipEl.innerHTML = `No strong dining-style match found; showing general recommendations. Detected: <strong>${styles}</strong> (confidence ${conf}%)` 
-            return
+          // If this is the debug preview event, show its preview text in Events
+          if (event === 'step:debug:output_preview') {
+            events.textContent += `[${new Date().toLocaleTimeString()}] DEBUG PREVIEW: ${obj.type} ${obj.preview}\n`
           }
-        }
-      }
 
-      // No CAG yet - show illustrative tips for specific feeling keywords
-      if (f.includes('relax')) {
-        tipEl.innerHTML = `Tip: "Relaxed" typically maps to dining styles <strong>Brunch, Casual Dining</strong> (example confidence 56%). Expect generation that uses the CAG result plus your other preferences.`
-      } else if (f.includes('happy')) {
-        tipEl.innerHTML = `Tip: "Happy" may not map strongly to a single dining-style. Example: <strong>Casual Dining</strong> (confidence 40%) — below 50% so general recommendations are shown.`
-      } else if (f.includes('sad')) {
-        tipEl.innerHTML = `Tip: "Sad" might map to <strong>Comfort Food</strong> (example confidence 31%) but confidence is low, so general recommendations will be returned.`
-      } else {
-        tipEl.innerHTML = `Tip: enter a short feeling (e.g. "Relaxed", "Happy", "Sad") to see how the CAG maps feelings to dining styles.`
+          // If the event contains a generation output, try to parse and render it nicely
+          if (obj.output && (event && event === 'step:finished')) {
+            let out = obj.output
+            // Prefer RunOutput-like shapes that put text on `content` or `text`
+            try {
+              if (out && typeof out === 'object' && out.content !== undefined) out = out.content
+              else if (out && typeof out === 'object' && out.text !== undefined) out = out.text
+            } catch (e) {}
+
+            // strip markdown code fences if present
+            if (typeof out === 'string') {
+              out = out.trim()
+              // remove ```json or ``` wrappers
+              out = out.replace(/^```\w*\n/, '')
+              out = out.replace(/\n```$/, '')
+            }
+            let parsed = out
+            try {
+              if (typeof out === 'string') parsed = JSON.parse(out)
+            } catch (e) { /* keep raw string */ }
+
+            // Support alternative keys for arrays of recommendations
+            let candidates = null
+            if (parsed && typeof parsed === 'object') {
+              candidates = parsed.restaurants || parsed.recommendations || parsed.results || parsed.items || null
+            }
+
+            // If parsed is an object with restaurants/recommendations array, render cards
+            if (candidates && Array.isArray(candidates)) {
+              renderResult(candidates, obj.cag_result || null)
+              // re-enable buttons now that generation finished
+              Array.from(document.querySelectorAll('#form button')).forEach(b=>b.disabled=false)
+            } else {
+              // fallback: show pretty-printed content
+              result.textContent = typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2)
+              Array.from(document.querySelectorAll('#form button')).forEach(b=>b.disabled=false)
+            }
+          }
+
+          if (obj.session_id) {
+            // fetch traces after finished
+            fetch('/traces/' + obj.session_id).then(r=>r.json()).then(j=>{
+              traces.textContent = JSON.stringify(j, null, 2)
+            })
+          }
+        } catch (e){}
       }
     }
+  }
 
-    // Update tip live as user types
-    document.getElementById('feeling-input').addEventListener('input', (e)=>{
-      latestFeeling = e.target.value || ''
-      updateTip()
-    })
+  let doRAGMatching = false;
+  let mode = "normal";
 
-    // Populate selects from server-provided enums
-    async function loadOptions() {
-      try {
-        const res = await fetch('/options')
-        const j = await res.json()
-
-        const cuisineSelect = document.getElementById('cuisine-select')
-        cuisineSelect.innerHTML = ''
-        for (const c of j.cuisines) {
-          const opt = document.createElement('option')
-          opt.value = c
-          opt.textContent = c.charAt(0).toUpperCase() + c.slice(1)
-          cuisineSelect.appendChild(opt)
-        }
-
-        const dietarySelect = document.getElementById('dietary-select')
-        dietarySelect.innerHTML = ''
-        for (const d of j.dietary_requirements) {
-          const opt = document.createElement('option')
-          opt.value = d
-          // display-friendly label
-          opt.textContent = d.split('-').map(s=>s.charAt(0).toUpperCase()+s.slice(1)).join(' ')
-          dietarySelect.appendChild(opt)
-        }
-
-      } catch (e) {
-        console.error('Failed to load options', e)
-      }
+  form.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button')
+    if (btn && btn.dataset.rag !== undefined) {
+      doRAGMatching = btn.dataset.rag === "true"
     }
+  })
+
+  // Hook our minimal implementation to the form: map `feeling` -> `description` for server
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault()
+    events.textContent = ''
+    traces.textContent = ''
+
+    // Show a loading indicator while generation runs and disable buttons
+    result.innerHTML = `<div class="muted">Loading recommendations…</div>`
+    const buttons = Array.from(form.querySelectorAll('button'))
+    buttons.forEach(b => b.disabled = true)
+
+    const fd = new FormData()
+    const feeling = document.getElementById('feeling-input').value || 'not set'
+    fd.append('feeling', feeling)
+    // preserve selects
+    fd.append('cuisine', document.getElementById('cuisine-select').value)
+    fd.append('dietary_requirement', document.getElementById('dietary-select').value)
+
+    // send the flag
+    fd.append('do_rag_matching', doRAGMatching)
+
+    fd.append("mode", mode)
+    mode = "normal" // reset after use
+
+    // Start the SSE POST; re-enable buttons when finished event arrives
+    postSSE(fd).catch(() => buttons.forEach(b => b.disabled = false))
+  })
+
+  // Random button: pick a sample feeling, set it, and submit the form
+  document.getElementById("random-btn").addEventListener("click", () => {
+    mode = "random";
+    form.requestSubmit(); // trigger submit
+  });
+
+  // Populate selects from server-provided enums
+  async function loadOptions() {
+    try {
+      const res = await fetch('/options')
+      const j = await res.json()
+
+      const cuisineSelect = document.getElementById('cuisine-select')
+      cuisineSelect.innerHTML = ''
+      for (const c of j.cuisines) {
+        const opt = document.createElement('option')
+        opt.value = c
+        opt.textContent = c.charAt(0).toUpperCase() + c.slice(1)
+        cuisineSelect.appendChild(opt)
+      }
+
+      const dietarySelect = document.getElementById('dietary-select')
+      dietarySelect.innerHTML = ''
+      for (const d of j.dietary_requirements) {
+        const opt = document.createElement('option')
+        opt.value = d
+        // display-friendly label
+        opt.textContent = d.split('-').map(s=>s.charAt(0).toUpperCase()+s.slice(1)).join(' ')
+        dietarySelect.appendChild(opt)
+      }
+
+    } catch (e) {
+      console.error('Failed to load options', e)
+    }
+  }
 
   // load options on page load
   loadOptions()
 
-  // initialize tip based on default feeling value
-  updateTip()
-
-    function renderResult(restaurants, cag) {
+    function renderResult(restaurants, cag_result) {
       // header showing guessed dining style
       let header = ''
-      if (cag && cag.dining_styles && cag.dining_styles.length && !cag.fallback) {
-        const styles = cag.dining_styles.join(', ')
-        const conf = cag.confidence ? ` (confidence ${Math.round(cag.confidence * 100)}%)` : ''
+      if (cag_result && cag_result.dining_styles && cag_result.dining_styles.length && !cag_result.fallback) {
+        const styles = cag_result.dining_styles.join(', ')
+        const conf = cag_result.confidence ? ` (confidence ${Math.round(cag_result.confidence * 100)}%)` : ''
         header = `<div class="muted">Guess you like: <strong>'${styles}'</strong>${conf}</div>`
-      } else if (cag && cag.fallback) {
+      } else if (cag_result && cag_result.fallback) {
         header = `<div class="muted">No strong dining-style match found; showing general recommendations.</div>`
       }
 

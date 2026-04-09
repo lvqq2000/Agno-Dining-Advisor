@@ -17,7 +17,11 @@ def generate_random_step(state):
 
         agent = generate_agent()
 
+        print(f"Running agent with template: {template_text}")
+        
         result = agent.run(template_text)
+
+        print(f"State before generation: {result}")
 
         state["output"] = result
         return state
