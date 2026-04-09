@@ -2,7 +2,7 @@
 
 All notable changes for this release are documented in this file.
 
-## [Unreleased] - 2026-04-07
+## CAG Implementation - 2026-04-07
 
 ### Added
 - POST /recommend endpoint that runs the multi-step recommendation workflow and streams progress via Server-Sent Events (SSE). Events are emitted per-step (e.g. `step:cag_match`, `step:generate`, `step:finished`).
