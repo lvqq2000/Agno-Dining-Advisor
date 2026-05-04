@@ -1,11 +1,12 @@
 from app.agents.generate import generate_agent
+from agno.agent import RunEvent
 from app.db.repositories.prompt_repository import get_prompt_template
 from app.db.session import SessionLocal
 from app.models.enums import TemplateType
 from app.services.template_renderer import render_template
 
 
-def generate_recommendation_step(state):
+def generate_with_only_selection_step(state):
     session = SessionLocal()
 
     try:

@@ -15,11 +15,60 @@ Agno Dining Advisor is a simple open-source restaurant recommendation tool. For 
   - [How to run the project](#how-to-run-the-project)
     - [1. Install Make (if not already installed)](#1-install-make-if-not-already-installed)
     - [2. Run the project](#2-run-the-project)
+    - [3. Access the test interface](#3-access-the-test-interface)
     - [3. Run tests](#3-run-tests)
+    - [Future Improvements](#future-improvements)
 
 ## Architecture Overview
 
-TO DO
+```
+.
+├── alembic/                           # DB migration scripts (alembic)
+├── app/                               # Application code (FastAPI + workflow + agents)
+│   ├── agents/                        # Agent factories (CAG, RAG, generate)
+│   ├── core/                          # Config and constants
+│   ├── db/                            # SQLAlchemy models, session, repositories and seeds
+│   │   ├── models/                    # ORM models (cag_reference_data, prompt_template, traces)
+│   │   └── seeds/                     # DB seed scripts for reference data & templates
+│   ├── workflows/                     # Workflow definitions and step implementations
+│   ├── services/                      # Embedding, LLM callers, matching logic
+│   ├── static/                        # Simple test UI (`test.html`) for SSE demo
+│   └── main.py                        # FastAPI app (endpoints: /recommend, /traces, /test, /options)
+├── docker-compose.yml                 # Docker compose for app + pgvector Postgres
+├── Dockerfile                         # App container image
+├── requirements.txt                   # Python dependencies
+└── README.md                          # This document
+```
+
+Key responsibilities
+
+- FastAPI (`app/main.py`): exposes the API and a small synchronous runner used to
+  stream Server-Sent Events (SSE) back to clients while persisting per-step traces
+  to Postgres for observability.
+- Workflow (`app/workflows/*`): composed of small steps:
+  - `intake_step` — normalize incoming form data (the canonical `feeling` field)
+  - `cag_match_step` — embed the free-text input and find top-matching dining styles
+  - `rag_retrieve_step` — optional retrieval against a knowledge base (pgvector)
+  - `generate_*_step` — render prompts (using DB-held templates) and run generation
+  - `validate_output_step` — pydantic validation of the final JSON
+- Agents (`app/agents/*`): factory functions that create agent objects used by steps
+  (RAG agent runs searches when `search_knowledge=True`). The app currently provides
+  a small local shim for a missing `agno` library so development can proceed.
+- Embeddings (`app/services/embedding_service.py`): uses sentence-transformers
+  `all-mpnet-base-v2` to produce 768‑dim vectors. The seeder and runtime must use
+  the same model and dimension to keep similarity calculations correct.
+- Data & persistence (`app/db/*` + alembic): Postgres holds:
+  - `cag_reference_data` — labeled reference text with embeddings and dining_styles
+  - `prompt_templates` — generation templates with versions
+  - `traces` — per-step observability records (session_id, step, input, output, status)
+
+Runtime flow (request)
+
+1. Client POSTs form to `/recommend` (feeling + optional cuisine/dietary).
+2. App creates a `session_id` and runs the workflow steps, emitting SSE events per-step.
+3. Each step writes a trace record to Postgres (used by `/traces/{session_id}`).
+4. If CAG is low-confidence or absent, RAG retrieval runs to augment generation context.
+5. The generator produces a JSON recommendation which is validated and streamed back.
 
 ## Setup Instructions
 
@@ -90,9 +139,13 @@ After completing the setup:
 make setup
 ```
 
+### 3. Access the test interface
+
+Open <http://localhost:8000> or <http://localhost:8000/test> to interact with the project through a simple UI.
+
 ### 3. Run tests
 
-> TO DO
+> TO DO. Not yet implemented.
 
 ```bash
 # Run all tests
@@ -103,3 +156,13 @@ Notes
 
 - Make sure Docker is running before starting the project.
 - If you encounter issues, check the .env configuration and ensure all required variables are set.
+
+### Future Improvements
+
+- Add unit tests, end-to-end tests and integrated tests
+- Optional template versioning
+- Improve error handling logic such as multiple guardrails (structural + content-level), retry attempts
+- Better CAG edge cases handles for multiple strong matches
+- Better structured SSE events
+- Add the ability to show process on knowledge insert - right now the documents are not chunked, which make the retrival process very long. Also it should show error if fail to insert
+- Better UI
